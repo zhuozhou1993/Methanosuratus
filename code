@@ -1,0 +1,43 @@
+conda activate qiime2
+qiime tools import \
+--type 'SampleData[SequencesWithQuality]' \
+--input-path maintest \
+--output-path ~/D1.qza \
+--input-format SingleEndFastqManifestPhred33
+qiime demux summarize \
+--i-data ~/D1.qza \
+--o-visualization ~/D1.qzv
+qiime dada2 denoise-single \
+--i-demultiplexed-seqs ~/D1.qza \
+--p-trim-left 5 --p-trunc-len 370 \
+--o-representative-sequences ~/D1-seqs-dada2_L5_R370.qza \
+--p-n-threads 40 --o-table ~/D1-table-dada2_L5_R370.qza \
+--o-denoising-stats ~/D1.denoising.qza
+qiime metadata tabulate \
+--m-input-file ~/D1.denoising.qza \
+--o-visualization ~/D1.denoising.qzv
+qiime feature-table summarize \
+--i-table ~/D1-table-dada2_L5_R370.qza \
+--o-visualization ~/D1-table-dada2_L5_R370.qzv \
+--m-sample-metadata-file metadata
+qiime feature-table tabulate-seqs \
+--i-data ~/D1-seqs-dada2_L5_R370.qza \
+--o-visualization ~/D1-seqs-dada2_L5_R370.qzv
+qiime feature-classifier classify-sklearn \
+--i-classifier ~/silva-138-ssu-nr99-519f-915r-classifier.qza \
+--i-reads ~/D1-seqs-dada2_L5_R370.qza \
+--o-classification ~/D1_taxonomy.dada2_L5_R370.qza
+mkdir phyloseq
+qiime tools export \
+--input-path ~/D1_taxonomy.dada2_L5_R370.qza \
+--output-path phyloseq
+qiime tools export \
+--input-path ~/D1-table-dada2_L5_R370.qza \
+--output-path phyloseq
+cd phyloseq
+biom convert \
+-i feature-table.biom \
+-o feature-table.tsv \
+--to-tsv \
+--header-key taxonomy
+
