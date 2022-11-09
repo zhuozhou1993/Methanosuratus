@@ -1,3 +1,5 @@
+Amplicon pipeline
+
 conda activate qiime2
 qiime tools import \
 --type 'SampleData[SequencesWithQuality]' \
@@ -41,3 +43,27 @@ biom convert \
 --to-tsv \
 --header-key taxonomy
 
+
+metaG pipeline
+
+trim；
+java -jar ~/trimmomatic-0.38.jar PE clean_1.fastq clean_2.fastq output_forward_paired.fq.gz output_forward_unpaired.fq.gz output_reverse_paired.fq.gz output_reverse_unpaired.fq.gz ILLUMINACLIP:TruSeq3-PE.fa:2:30:10 LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15 MINLEN:36 -threads 40
+spadeout;
+~/spades.py --meta -k 21,33,55,77,99,127 -t 40 -1 ~/output_forward_paired.fq.gz -2 ~/output_reverse_paired.fq.gz -o ~/spa_out
+metawrap;
+metawrap binning --metabat2 --maxbin2 --concoct -o INITIAL_BINNING -t 40 -a scaffolds.fasta ~/clean_1.fastq ~/clean_2.fastq;
+metawrap bin_refinement -o BIN_REFINEMENT -t 40 -A INITIAL_BINNING/metabat2_bins/ -B INITIAL_BINNING/maxbin2_bins/ -C INITIAL_BINNING/concoct_bins/ -c 50 -x 10;
+metawrap reassemble_bins -o BIN_REASSEMBLY -1 ~/clean_1.fastq -2 ~/clean_2.fastq -t 40 -m 800 -c 50 -x 10 -b BIN_REFINEMENT/metawrap_50_10_bins;
+checkm lineage_wf -x fa -t 40 checkm_res;
+gtdbtk classify_wf --genome_dir gtdbtk_test/genomes --out_dir gtdbtk_test/output --cpus 40;
+prodigal -i scaffold.fasta -a prot.fasta -d nucl.fasta -p meta;
+
+metaT pipeline
+
+bwa index rep_MAGs.fna;
+bwa mem -t 40 rep_MAGs.fna 1.clean.fq 2.clean.fq > scaffold.sam 2> scaffold.log;
+~/samtools view -bS scaffold.sam > all.bam -@ 40;
+~/samtools sort all.bam -o all_sort.bam -@ 40;
+~/samtools index all_sort.bam;
+perl /scripts/SeqTools/length+GC.pl -f rep_MAGs.fna -len | sed 's/\s.*\t/\t/' | sed 's/\t/\t0\t/' > scaffold.bed;
+bedtools coverage -a scaffold.bed -b all_sort.bam -counts > scaffold.bamstat;
